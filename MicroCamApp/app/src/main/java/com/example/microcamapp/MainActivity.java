@@ -3,12 +3,16 @@ package com.example.microcamapp;
 import android.content.pm.PackageManager;
 import android.media.MediaRecorder;
 import android.os.Environment;
+import android.os.Handler;
+import android.speech.tts.TextToSpeech;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.camerakit.CameraKit;
@@ -16,6 +20,7 @@ import com.camerakit.CameraKitView;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.Locale;
 
 import static android.Manifest.permission.RECORD_AUDIO;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
@@ -27,22 +32,94 @@ public class MainActivity extends AppCompatActivity {
     public static final int REQUEST_AUDIO_PERMISSION_CODE = 1;
     private boolean flagRecording;
     private ImageView recordBtn;
+    private TextView audioText;
+
+    //TextToSpeech Variables
+    private TextToSpeech speechMachine;
+
+    ////Handler Variables
+    private Handler mainHandler = new Handler();
 
     //Camera Variables
     private CameraKitView cameraKitView;
+    private boolean flagTakePhoto;
+    private int photoCounter;
+    Thread photos_thread = new Thread() {
+        @Override
+        public void run()
+        {
+            photoCounter = 0;
+            while(speechMachine.isSpeaking())
+            {
+                //wait
+            };
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run()
+                {
+                    //mostrar view de camara
+                    cameraKitView.setVisibility(View.VISIBLE);
+                }
+            });
+            while(photoCounter < 4)//aqui se define el numero de fotos a tomar
+            {
+                if(flagTakePhoto)
+                {
+                    photoCounter++;
+                    flagTakePhoto = false;
+                    //call runnable/method
+                    mainHandler.postDelayed(new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            takePhoto();
+                        }
+                    },500);
+                }
+            }
+            cameraKitView.setVisibility(View.INVISIBLE);
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run()
+                {
+                    //avisar que ya se realizo el registro
+                    speechMachine.speak("El registro fue realizado exitosamente", TextToSpeech.QUEUE_ADD, null, null);
+                }
+            });
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        flagRecording = false;
-        recordBtn = findViewById(R.id.i_record);
 
-        //camera init
+        //initialization
+        flagRecording = false;
+        flagTakePhoto = true;
+        recordBtn = findViewById(R.id.i_record);
+        audioText = findViewById(R.id.t_audio);
+
+        //camera initialization
         cameraKitView = findViewById(R.id.camera);
         cameraKitView.setFacing(CameraKit.FACING_FRONT);
         cameraKitView.setVisibility(View.INVISIBLE);
+
+        //TextToSpeech initialization
+        speechMachine = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status)
+            {
+                Locale locSpanish = new Locale("spa", "COL");
+                speechMachine.setLanguage(locSpanish);
+                if (status == TextToSpeech.SUCCESS)
+                {
+                    ///here the machine can start to speak
+                    showToast("TextoToSpeech succesfully");
+                }
+            }
+        });
     }
     @Override
     protected void onStart() {
@@ -101,9 +178,9 @@ public class MainActivity extends AppCompatActivity {
     {
         if(!flagRecording)
         {
-            cameraKitView.setVisibility(View.VISIBLE);
             //comenzar a grabar audio
             flagRecording = true;
+            audioText.setVisibility(View.INVISIBLE);
             recordBtn.setImageResource(R.drawable.recording);
             recordAudio();
         }
@@ -116,26 +193,30 @@ public class MainActivity extends AppCompatActivity {
             recorder.release();
             recorder = null;
             showToast("Fin de la grabacion");
-            cameraKitView.captureImage(new CameraKitView.ImageCallback() {
-                @Override
-                public void onImage(CameraKitView cameraKitView, final byte[] capturedImage) {
-                    File savedPhoto = new File(Environment.getExternalStorageDirectory(), "tiger.jpg");
-                    try {
-                        FileOutputStream outputStream = new FileOutputStream(savedPhoto.getPath());
-                        outputStream.write(capturedImage);
-                        outputStream.close();
-                        cameraKitView.setVisibility(View.INVISIBLE);
-                    } catch (java.io.IOException e)
-                    {
-                        e.printStackTrace();
-                    }
-                }
-            });
+            speechMachine.speak("Ahora se tomara registro de su cara, mire a la camara por favor", TextToSpeech.QUEUE_ADD, null, null);
+            //start taking photos
+            photos_thread.start();
         }
     }
-    private void takePicture()
+    private void takePhoto()
     {
-
+        cameraKitView.captureImage(new CameraKitView.ImageCallback() {
+            @Override
+            public void onImage(CameraKitView cameraKitView, final byte[] capturedImage) {
+                File savedPhoto = new File(Environment.getExternalStorageDirectory(), "registro" + String.valueOf(photoCounter) + ".jpg");
+                try {
+                    FileOutputStream outputStream = new FileOutputStream(savedPhoto.getPath());
+                    outputStream.write(capturedImage);
+                    outputStream.close();
+                    Log.i("Callback INFO: ","onImage FIN!");
+                    flagTakePhoto = true;
+                } catch (java.io.IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        });
+        Log.i("Method INFO: ","takePictures FIN!");
     }
     private void requestPermissions()
     {
@@ -156,5 +237,16 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
             }
         });
+    }
+    public void exitApp(View view)
+    {
+        photoCounter = 10;
+        flagTakePhoto = false;
+        if(photos_thread.isAlive())
+        {
+            showToast("thread is alive!");
+            photos_thread.interrupt();
+        }
+        finish();
     }
 }
