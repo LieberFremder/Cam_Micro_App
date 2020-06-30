@@ -1,10 +1,13 @@
 package com.example.microcamapp;
 
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.MediaRecorder;
 import android.os.Environment;
 import android.os.Handler;
+import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -20,6 +23,7 @@ import com.camerakit.CameraKitView;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.Locale;
 
 import static android.Manifest.permission.RECORD_AUDIO;
@@ -27,6 +31,7 @@ import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int REQUEST_CODE_SPEECH_INPUT = 1000;
     //Recorder Variables
     private MediaRecorder recorder;
     public static final int REQUEST_AUDIO_PERMISSION_CODE = 1;
@@ -214,6 +219,26 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+    public void startSpeech(View view)
+    {
+        //SPEECH TO TEXT SECTION
+        Locale locSpanish = new Locale("spa", "COL");
+        Intent speechIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        speechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        speechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE,locSpanish);
+        speechIntent.putExtra(RecognizerIntent.EXTRA_PROMPT,"Empieza a hablar!");
+
+        try
+        {
+            //start intent
+            showToast("Debes decir: grabar");
+            startActivityForResult(speechIntent,REQUEST_CODE_SPEECH_INPUT);
+        }
+        catch (Exception e)
+        {
+            showToast(""+e.getMessage());
+        }
+    }
     private void requestPermissions()
     {
         ActivityCompat.requestPermissions(MainActivity.this, new String[]{RECORD_AUDIO, WRITE_EXTERNAL_STORAGE}, REQUEST_AUDIO_PERMISSION_CODE);
@@ -243,5 +268,32 @@ public class MainActivity extends AppCompatActivity {
             photos_thread.interrupt();
         }
         finish();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode == REQUEST_CODE_SPEECH_INPUT)
+        {
+                if(resultCode == RESULT_OK && null!=data)
+                {
+                    //get text array from voice
+                    ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                    if(result.get(0).equals("grabar"))
+                    {
+                        mainHandler.postDelayed(new Runnable() {
+                            @Override
+                            public void run()
+                            {
+                                recordBtn.performClick();
+                            }
+                        },3500);
+                    }
+                    else
+                    {
+                        showToast("Palabra incorrecta, intentalo de nuevo");
+                    }
+                }
+        }
     }
 }
