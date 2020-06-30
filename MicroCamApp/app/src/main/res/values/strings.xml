@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">MicroCamApp</string>
-    <string name="text_title">Registro</string>
+    <string name="text_title">Grabacion y Registro</string>
+    <string name="text_recording">Grabando audio…</string>
+    <string name="text_exitb">SALIR</string>
 </resources>

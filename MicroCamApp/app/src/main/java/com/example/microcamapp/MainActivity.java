@@ -53,14 +53,14 @@ public class MainActivity extends AppCompatActivity {
             {
                 //wait
             };
-            mainHandler.post(new Runnable() {
+            mainHandler.postDelayed(new Runnable() {
                 @Override
                 public void run()
                 {
                     //mostrar view de camara
                     cameraKitView.setVisibility(View.VISIBLE);
                 }
-            });
+            },400);
             while(photoCounter < 4)//aqui se define el numero de fotos a tomar
             {
                 if(flagTakePhoto)
@@ -82,8 +82,8 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run()
                 {
-                    //avisar que ya se realizo el registro
-                    speechMachine.speak("El registro fue realizado exitosamente", TextToSpeech.QUEUE_ADD, null, null);
+                    //avisar que ya se realizo el registro de la cara
+                    speechMachine.speak("El registro fue realizado exitosamente, gracias", TextToSpeech.QUEUE_ADD, null, null);
                 }
             });
         }
@@ -113,11 +113,6 @@ public class MainActivity extends AppCompatActivity {
             {
                 Locale locSpanish = new Locale("spa", "COL");
                 speechMachine.setLanguage(locSpanish);
-                if (status == TextToSpeech.SUCCESS)
-                {
-                    ///here the machine can start to speak
-                    showToast("TextoToSpeech succesfully");
-                }
             }
         });
     }
@@ -171,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         recorder.start();
-        showToast("Grabando audio");
+        audioText.setText(R.string.text_recording);
     }
 
     public void actionRecording(View view)
@@ -180,7 +175,6 @@ public class MainActivity extends AppCompatActivity {
         {
             //comenzar a grabar audio
             flagRecording = true;
-            audioText.setVisibility(View.INVISIBLE);
             recordBtn.setImageResource(R.drawable.recording);
             recordAudio();
         }
@@ -188,12 +182,15 @@ public class MainActivity extends AppCompatActivity {
         {
             //finalizar la grabacion audio
             flagRecording = false;
+            audioText.setVisibility(View.INVISIBLE);
             recordBtn.setImageResource(R.drawable.norecording);
+            recordBtn.setEnabled(false);
             recorder.stop();
             recorder.release();
             recorder = null;
             showToast("Fin de la grabacion");
-            speechMachine.speak("Ahora se tomara registro de su cara, mire a la camara por favor", TextToSpeech.QUEUE_ADD, null, null);
+            audioText.setVisibility(View.INVISIBLE);
+            speechMachine.speak("El audio ha sido almacenado, ahora se tomara registro de su cara, mire a la camara por favor", TextToSpeech.QUEUE_ADD, null, null);
             //start taking photos
             photos_thread.start();
         }
@@ -201,6 +198,7 @@ public class MainActivity extends AppCompatActivity {
     private void takePhoto()
     {
         cameraKitView.captureImage(new CameraKitView.ImageCallback() {
+            //this callback is async
             @Override
             public void onImage(CameraKitView cameraKitView, final byte[] capturedImage) {
                 File savedPhoto = new File(Environment.getExternalStorageDirectory(), "registro" + String.valueOf(photoCounter) + ".jpg");
@@ -208,7 +206,6 @@ public class MainActivity extends AppCompatActivity {
                     FileOutputStream outputStream = new FileOutputStream(savedPhoto.getPath());
                     outputStream.write(capturedImage);
                     outputStream.close();
-                    Log.i("Callback INFO: ","onImage FIN!");
                     flagTakePhoto = true;
                 } catch (java.io.IOException e)
                 {
@@ -216,7 +213,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        Log.i("Method INFO: ","takePictures FIN!");
     }
     private void requestPermissions()
     {
@@ -240,11 +236,10 @@ public class MainActivity extends AppCompatActivity {
     }
     public void exitApp(View view)
     {
-        photoCounter = 10;
         flagTakePhoto = false;
         if(photos_thread.isAlive())
         {
-            showToast("thread is alive!");
+            //terminar el hilo
             photos_thread.interrupt();
         }
         finish();
